@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Drone Response - Public Dashboard</title>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root{
+  --bg:#f5f7fb; --card:#ffffff; --muted:#6b7280; --ink:#111827;
+  --brand:#0a2a66; --shadow:0 6px 18px rgba(16,24,40,.08); --radius:14px;
+}
+
+body{
+  display:flex;
+  min-height:100vh;
+  font-family:"Segoe UI", system-ui, sans-serif;
+  background: url("image2.jpg") center/cover fixed no-repeat;
+}
+
+/* SIDEBAR */
+.sidebar{
+  width:240px; background: rgba(10,42,102,0.95);
+  color:#fff; display:flex; flex-direction:column;
+  padding:2rem 1rem;
+}
+.sidebar h2{ text-align:center; margin-bottom:1.6rem; }
+.sidebar button{
+  background:transparent; border:none; color:#ffffffcc;
+  text-align:left; font-size:1rem; padding:.85rem 1rem;
+  border-radius:10px; cursor:pointer; margin-bottom:.6rem;
+}
+.sidebar button:hover, .sidebar button.active{
+  background:#1b4dbb; color:#fff;
+}
+
+/* MAIN */
+.main{
+  flex:1; padding:2.2rem 3rem;
+  background: rgba(255,255,255,0.75);
+  border-radius:16px;
+  margin:1.2rem;
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow);
+  overflow:auto;
+}
+
+/* ✅ FIXED HERO IMAGE — NO STRETCH */
+.hero-title {
+  width: 100%;
+  height: 260px; /* adjust if needed */
+  background-image:
+    linear-gradient(to bottom, rgba(0,0,0,0.45), rgba(0,0,0,0.65)),
+    url("image1.jpg");
+  background-size: contain;     /* ✅ stops stretching & zooming */
+  background-repeat: no-repeat;
+  background-position: center center;
+  border-radius: 14px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  color:white;
+  font-size: 2.4rem;
+  font-weight: 700;
+  text-shadow: 0 3px 12px rgba(0,0,0,0.85);
+  margin-bottom: 1.6rem;
+}
+
+/* CARDS + LIST + TABLE */
+.stats{ display:grid; grid-template-columns: repeat(5, minmax(160px,1fr)); gap:1.2rem; margin-bottom:2rem; }
+.stat-card{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:1.2rem 1.4rem; text-align:center; }
+.stat-card h3{ color:var(--muted); font-size:.92rem; }
+.stat-card p{ color:var(--brand); font-weight:700; font-size:2.1rem; }
+
+.list{ max-height:300px; overflow:auto; border-top:1px solid #eef0f4; }
+.list-item{ padding:10px 0; border-bottom:1px solid #eef0f4; display:flex; justify-content:space-between; }
+.list-meta{ color:var(--muted); font-size:.88rem; }
+
+.query-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:1.2rem; }
+.card{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:1.3rem 1.5rem; }
+table{ width:100%; border-collapse:collapse; margin-top:.5rem; }
+th,td{ padding:8px; border:1px solid #ddd; }
+th{ background:#f2f4f7; font-weight:600; }
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+  <h2>Disaster Dashboard</h2>
+  <button class="active" onclick="showSection('overview')">📊 Overview</button>
+  <button onclick="showSection('reports')">🧠 Reports</button>
+</div>
+
+<div class="main">
+
+<!-- ✅ HERO BANNER (NOW FIXED) -->
+<div class="hero-title">
+  Drone Disaster Response Dashboard
+</div>
+
+<!-- ✅ OVERVIEW PANEL -->
+<section id="overview" class="section">
+  <div class="stats">
+    <div class="stat-card"><h3>Active Disasters</h3><p id="activeDisasters">-</p></div>
+    <div class="stat-card"><h3>Ongoing Missions</h3><p id="ongoingMissions">-</p></div>
+    <div class="stat-card"><h3>Completed Missions</h3><p id="completedMissions">-</p></div>
+    <div class="stat-card"><h3>Total Drones</h3><p id="totalDrones">-</p></div>
+    <div class="stat-card"><h3>Drones in Maintenance</h3><p id="maintenanceDrones">-</p></div>
+  </div>
+
+  <div class="card">
+    <h3>Active Disasters</h3>
+    <div id="disasterList" class="list">Loading...</div>
+  </div>
+</section>
+
+<!-- ✅ REPORTS PANEL -->
+<section id="reports" class="section" style="display:none;">
+  <h1>Analytics Reports</h1>
+  <div class="query-grid">
+    <div class="card"><h3>Mission Performance</h3><div id="output1"></div></div>
+    <div class="card"><h3>Available Personnel</h3><div id="output2"></div></div>
+    <div class="card"><h3>Critical Drone Alerts</h3><div id="output3"></div></div>
+    <div class="card"><h3>Resources Usage</h3><div id="output4"></div></div>
+    <div class="card" style="grid-column:1/-1;"><h3>Payload Tier Summary</h3><div id="output5"></div></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+function showSection(id){
+  document.querySelectorAll('.section').forEach(s=>s.style.display='none');
+  document.getElementById(id).style.display='block';
+  document.querySelectorAll('.sidebar button').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+async function loadOverview(){
+  const data = await (await fetch("/api/overview")).json();
+  activeDisasters.textContent = data.activeDisasters;
+  ongoingMissions.textContent = data.ongoingMissions;
+  completedMissions.textContent = data.completedMissions;
+  totalDrones.textContent = data.totalDrones;
+  maintenanceDrones.textContent = data.maintenanceDrones;
+
+  disasterList.innerHTML = "";
+  data.disasters.forEach(d=>{
+    disasterList.innerHTML+=`<div class="list-item"><strong>${d.Name}</strong><span class="list-meta">${d.Type} — ${d.Location}</span></div>`;
+  });
+}
+
+async function fetchReport(q,id){
+  const data = await (await fetch(`/api/${q}`)).json();
+  const container=document.getElementById(id);
+  container.innerHTML="";
+  if(!data.length){ container.textContent="No data."; return; }
+  const table=document.createElement("table");
+  const head=table.createTHead().insertRow();
+  Object.keys(data[0]).forEach(k=>head.insertCell().textContent=k.replace(/_/g," "));
+  const body=table.createTBody();
+  data.forEach(r=>{ const tr=body.insertRow(); Object.values(r).forEach(v=>tr.insertCell().textContent=v); });
+  container.appendChild(table);
+}
+
+window.onload=()=>{
+  loadOverview();
+  ["query1","query2","query3","query4","query5"].forEach((q,i)=>fetchReport(q,`output${i+1}`));
+};
+</script>
+
+</body>
+</html>

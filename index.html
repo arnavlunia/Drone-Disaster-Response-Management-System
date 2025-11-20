@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drone Disaster Response Dashboard</title>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root{
+      --bg:#f5f7fb; --card:#ffffff; --muted:#6b7280; --ink:#111827;
+      --brand:#0a2a66; --shadow:0 6px 18px rgba(16,24,40,.08); --radius:14px;
+    }
+    body{ display:flex; min-height:100vh; background:var(--bg); color:var(--ink);
+      font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; }
+
+    .sidebar{ width:240px; background:var(--brand); color:#fff; display:flex; flex-direction:column; padding:2rem 1rem; }
+    .sidebar h2{ text-align:center; font-weight:600; margin-bottom:1.6rem; }
+    .sidebar button{ background:transparent; border:none; color:#ffffffcc; text-align:left; font-size:1rem; padding:.85rem 1rem; border-radius:10px; cursor:pointer; margin-bottom:.6rem; }
+    .sidebar button:hover, .sidebar button.active{ background:#1b4dbb; color:#fff; }
+
+    .main{ flex:1; padding:2.2rem 3rem; overflow:auto; }
+    .page-title{ text-align:center; margin-bottom:1.6rem; }
+    .page-title h1{ font-size:2rem; font-weight:700; color:#0e1b3a; }
+    .page-title p{ margin-top:.45rem; color:var(--muted); font-size:.98rem; }
+
+    .stats{ display:grid; grid-template-columns: repeat(5, minmax(160px, 1fr)); gap:1.2rem; margin: 1.4rem 0 2rem; }
+    .stat-card{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:1.2rem 1.4rem; text-align:center; }
+    .stat-card h3{ color:var(--muted); font-size:.92rem; margin-bottom:.35rem; }
+    .stat-card p{ color:var(--brand); font-weight:700; font-size:2.1rem; }
+
+    .overview-grid{ display:grid; grid-template-columns: 2fr 1fr; gap:1.5rem; }
+    .card{ background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:1.3rem 1.5rem; }
+    .card h3{ font-weight:700; margin-bottom:1rem; }
+
+    .list{ max-height:320px; overflow:auto; border-top:1px solid #eef0f4; }
+    .list-item{ display:flex; justify-content:space-between; align-items:center; padding:.85rem 0; border-bottom:1px solid #eef0f4; font-size:.96rem; }
+    .list-meta{ color:var(--muted); font-size:.88rem; }
+
+    .status-chip { padding: 4px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 600; display: inline-block; }
+    .status-chip.Ongoing { background: #ffebe9; color: #b91c1c; }
+    .status-chip.Resolved { background: #e6f7ec; color: #15803d; }
+
+    .list-header{ display:flex; gap:12px; padding-bottom:8px; margin-bottom:6px; border-bottom:1px solid #dfe3ea; font-size:.85rem; color:#6b7280; font-weight:600; }
+    .col-2{ flex:2; } .col-1{ flex:1; } .text-center{ text-align:center; } .text-right{ text-align:right; }
+
+    .query-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:1.2rem; }
+    table{ width:100%; border-collapse:collapse; margin-top:.5rem; }
+    th,td{ padding:8px 10px; border:1px solid #e6e7eb; }
+    th{ background:#f2f4f7; }
+    .refresh{ margin-top:.2rem; background:#0a73ff; color:#fff; border:none; padding:.45rem .7rem; border-radius:8px; cursor:pointer; }
+
+    /* Forms */
+    .form-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+    .form-grid .full{ grid-column:1/-1; }
+    input, select{ width:100%; padding:9px; border-radius:8px; border:1px solid #cfd4dc; }
+    label{ font-weight:600; margin-top:6px; display:block; }
+    .btn{ background:#0a73ff; border:none; color:#fff; padding:.75rem 1.3rem; border-radius:8px; font-size:.95rem; cursor:pointer; margin-top:10px; }
+    .btn.delete-btn { background: #dc3545; } /* Red color for delete */
+    .helper{ color:#6b7280; font-size:.88rem; margin-top:4px; }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <h2>Drone Analytics</h2>
+    <button class="active" onclick="showSection('overview')">📊 Overview</button>
+    <button onclick="showSection('query-dashboard')">🧠 Detailed Queries</button>
+    <button onclick="showSection('insert-disaster')">➕ Add Disaster</button>
+    <button onclick="showSection('insert-drone')">🚁 Add Drone</button>
+    <button onclick="showSection('insert-operator')">👤 Add Operator</button>
+    <button onclick="showSection('insert-mission')">📄 Add Mission Report</button>
+    <button onclick="showSection('insert-alert')">⚠️ Add Alert</button>
+    <button onclick="showSection('resolve-disaster')">✅ Resolve Disaster</button>
+    <!-- NEW BUTTON -->
+    <button onclick="showSection('delete-disaster')">🗑️ Delete Disaster</button>
+  </div>
+
+  <div class="main">
+
+    <!-- OVERVIEW -->
+    <section id="overview" class="section">
+      <div class="page-title">
+        <h1>Drone Disaster Response Dashboard</h1>
+        <p>Real-time status of missions and fleet readiness.</p>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card"><h3>Active Disasters</h3><p id="activeDisasters">-</p></div>
+        <div class="stat-card"><h3>Ongoing Missions</h3><p id="ongoingMissions">-</p></div>
+        <div class="stat-card"><h3>Completed Missions</h3><p id="completedMissions">-</p></div>
+        <div class="stat-card"><h3>Total Drones</h3><p id="totalDrones">-</p></div>
+        <div class="stat-card"><h3>Drones in Maintenance</h3><p id="maintenanceDrones">-</p></div>
+      </div>
+
+      <div class="overview-grid">
+        <div class="card">
+          <h3>Active & Recent Disasters</h3>
+          <div class="list-header">
+            <div class="col-2">Name / Location & Type</div>
+            <div class="col-1 text-center">Status</div>
+            <div class="col-1 text-right">Start Time</div>
+          </div>
+          <div id="disasterList" class="list">Loading...</div>
+        </div>
+
+        <div class="card">
+          <h3>Personnel Roster</h3>
+          <div id="personnelList" class="list">Loading...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUERIES -->
+    <section id="query-dashboard" class="section" style="display:none;">
+      <h1 style="margin-bottom:1rem;">Detailed Query Reports</h1>
+      <div class="query-grid">
+        <div class="card"><h3>1) Mission performance by Disaster Type</h3><button class="refresh" onclick="fetchData('query1','output1')">Refresh</button><div id="output1"></div></div>
+        <div class="card"><h3>2) Available Personnel for Deployment</h3><button class="refresh" onclick="fetchData('query2','output2')">Refresh</button><div id="output2"></div></div>
+        <div class="card"><h3>3) Drones flagged for maintenance</h3><button class="refresh" onclick="fetchData('query3','output3')">Refresh</button><div id="output3"></div></div>
+        <div class="card"><h3>4) Resources used by ongoing disasters</h3><button class="refresh" onclick="fetchData('query4','output4')">Refresh</button><div id="output4"></div></div>
+        <div class="card" style="grid-column:1/-1;"><h3>5) Drone Payload Tier Summary</h3><button class="refresh" onclick="fetchData('query5','output5')">Refresh</button><div id="output5"></div></div>
+      </div>
+    </section>
+
+    <!-- ADD DISASTER -->
+    <section id="insert-disaster" class="section" style="display:none; max-width:720px;">
+      <h1 style="margin-bottom:1rem;">Add New Disaster</h1>
+      <form id="disasterForm" class="form-grid">
+        <div>
+          <label>D_ID</label><input name="D_ID" required>
+        </div>
+        <div>
+          <label>Name</label><input name="Name" required>
+        </div>
+        <div>
+          <label>Type</label><input name="Type" required>
+        </div>
+        <div>
+          <label>Location</label><input name="Location" required>
+        </div>
+        <div class="full">
+          <label>Start Time</label><input type="datetime-local" name="Start_Time" required>
+        </div>
+        <div class="full">
+          <button type="submit" class="btn">Submit</button>
+          <div id="msg-disaster" class="helper"></div>
+        </div>
+      </form>
+    </section>
+
+    <!-- ADD DRONE -->
+    <section id="insert-drone" class="section" style="display:none; max-width:720px;">
+      <h1 style="margin-bottom:1rem;">Add Drone</h1>
+      <form id="droneForm" class="form-grid">
+        <div>
+          <label>D_NO</label><input name="D_NO" required>
+        </div>
+        <div>
+          <label>Model</label><input name="Model" required>
+        </div>
+        <div>
+          <label>Payload (kg)</label><input name="Payload" type="number" step="0.01">
+        </div>
+        <div>
+          <label>Flying Hours</label><input name="Flying_Hours" type="number" step="0.01">
+        </div>
+        <div class="full">
+          <label>Disaster (D_ID)</label>
+          <select name="D_ID" id="drone-DID" required></select>
+        </div>
+        <div class="full">
+          <button type="submit" class="btn">Submit</button>
+          <div id="msg-drone" class="helper"></div>
+        </div>
+      </form>
+    </section>
+
+    <!-- ADD OPERATOR -->
+    <section id="insert-operator" class="section" style="display:none; max-width:720px;">
+      <h1 style="margin-bottom:1rem;">Add Operator</h1>
+      <form id="operatorForm" class="form-grid">
+        <div>
+          <label>O_ID</label><input name="O_ID" required>
+        </div>
+        <div>
+          <label>Name</label><input name="Name" required>
+        </div>
+        <div class="full">
+          <label>Certification</label><input name="Certification">
+        </div>
+        <div class="full">
+          <button type="submit" class="btn">Submit</button>
+          <div id="msg-operator" class="helper"></div>
+        </div>
+      </form>
+    </section>
+
+    <!-- ADD MISSION REPORT -->
+    <section id="insert-mission" class="section" style="display:none; max-width:720px;">
+      <h1 style="margin-bottom:1rem;">Add Mission Report</h1>
+      <form id="missionForm" class="form-grid">
+        <div>
+          <label>MR_ID</label><input name="MR_ID" required>
+        </div>
+        <div>
+          <label>Battery Remaining (%)</label><input name="Battery_Remaining" type="number" step="0.01">
+        </div>
+        <div>
+          <label>Distance Covered (km)</label><input name="Distance_Covered" type="number" step="0.01">
+        </div>
+        <div>
+          <label>Success Rate (%)</label><input name="Success_Rate" type="number" step="0.01">
+        </div>
+        <div class="full">
+          <label>People Aided</label><input name="People_Aided" type="number" step="1" value="0">
+        </div>
+        <div class="full">
+          <button type="submit" class="btn">Submit</button>
+          <div id="msg-mission" class="helper"></div>
+        </div>
+      </form>
+    </section>
+
+    <!-- ADD ALERT -->
+    <section id="insert-alert" class="section" style="display:none; max-width:720px;">
+      <h1 style="margin-bottom:1rem;">Add Alert</h1>
+      <form id="alertForm" class="form-grid">
+        <div>
+          <label>A_ID</label><input name="A_ID" required>
+        </div>
+        <div>
+          <label>Severity</label>
+          <select name="Severity" required>
+            <option value="">Select</option>
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+            <option>Critical</option>
+          </select>
+        </div>
+        <div>
+          <label>Type</label><input name="Type" placeholder="e.g., Battery, GPS, Collision">
+        </div>
+        <div>
+          <label>Resolution</label><input name="Resolution" placeholder="Optional">
+        </div>
+        <div>
+          <label>Mission (MR_ID)</label>
+          <select name="MR_ID" id="alert-MRID" required></select>
+        </div>
+        <div>
+          <label>Drone (D_NO)</label>
+          <select name="D_NO" id="alert-DNO" required></select>
+        </div>
+        <div class="full">
+          <label>Time</label>
+          <input type="datetime-local" name="Time" required>
+        </div>
+        <div class="full">
+          <button type="submit" class="btn">Submit</button>
+          <div id="msg-alert" class="helper"></div>
+        </div>
+      </form>
+    </section>
+
+    <!-- RESOLVE DISASTER -->
+    <section id="resolve-disaster" class="section" style="display:none; max-width:720px;">
+      <h1 style="margin-bottom:1rem;">Resolve Disaster</h1>
+      <form id="resolveForm" class="form-grid">
+        <div class="full">
+          <label>Select Disaster (D_ID)</label>
+          <select name="D_ID" id="resolve-DID" required></select>
+        </div>
+        <div class="full">
+          <button type="submit" class="btn">Mark as Resolved</button>
+          <div id="msg-resolve" class="helper"></div>
+        </div>
+      </form>
+    </section>
+    
+    <!-- DELETE DISASTER (NEW SECTION) -->
+    <section id="delete-disaster" class="section" style="display:none; max-width:720px;">
+      <h1 style="margin-bottom:1rem; color: #dc3545;">Delete Disaster</h1>
+      <p class="helper" style="margin-bottom:1rem;">
+        ⚠️ This action is permanent and may fail if the disaster is linked to active drones or mission reports (Foreign Key Constraint).
+      </p>
+      <form id="deleteDisasterForm" class="form-grid">
+        <div class="full">
+          <label>Select Disaster to Delete (D_ID)</label>
+          <select name="D_ID" id="delete-DID" required></select>
+        </div>
+        <div class="full">
+          <button type="submit" class="btn delete-btn">Delete Disaster</button>
+          <div id="msg-delete" class="helper"></div>
+        </div>
+      </form>
+    </section>
+
+  </div>
+
+  <script>
+    function showSection(id){
+      document.querySelectorAll('.section').forEach(s=>s.style.display='none');
+      document.getElementById(id).style.display='block';
+      document.querySelectorAll('.sidebar button').forEach(btn=>btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      // Populate dropdowns when entering forms
+      if (["insert-drone","insert-alert","resolve-disaster", "delete-disaster"].includes(id)) {
+        refreshRefs();
+      }
+    }
+
+    async function fetchData(query, outputId){
+      const res = await fetch(`/api/${query}`);
+      const data = await res.json();
+      const container=document.getElementById(outputId);
+      container.innerHTML="";
+      if(!data.length){ container.textContent="No data."; return; }
+      const table=document.createElement("table");
+      const thead=table.createTHead();
+      const hRow=thead.insertRow();
+      Object.keys(data[0]).forEach(k=>{
+        const th=document.createElement("th");
+        th.textContent=k.replace(/_/g," ");
+        hRow.appendChild(th);
+      });
+      const tbody=table.createTBody();
+      data.forEach(r=>{
+        const tr=tbody.insertRow();
+        Object.values(r).forEach(v=>{ tr.insertCell().textContent=v; });
+      });
+      container.appendChild(table);
+    }
+
+    async function loadOverview(){
+      const data = await (await fetch("/api/overview")).json();
+      document.getElementById("activeDisasters").textContent=data.activeDisasters;
+      document.getElementById("ongoingMissions").textContent=data.ongoingMissions;
+      document.getElementById("completedMissions").textContent=data.completedMissions;
+      document.getElementById("totalDrones").textContent=data.totalDrones;
+      document.getElementById("maintenanceDrones").textContent=data.maintenanceDrones;
+
+      const list=document.getElementById("disasterList");
+      list.innerHTML="";
+      data.disasters.forEach(d=>{
+        list.innerHTML+=        `<div class="list-item">
+          <div style="flex:2;"><strong>${d.Name}</strong><br><span class="list-meta">${d.Location} — ${d.Type}</span></div>
+          <div style="flex:1; text-align:center;"><span class="status-chip ${d.Status}">${d.Status}</span></div>
+          <div style="flex:1; text-align:right;"><span class="list-meta">${new Date(d.Start_Time).toLocaleDateString()}</span></div>
+        </div>`;      });
+
+      const roster=document.getElementById("personnelList");
+      roster.innerHTML="";
+      data.personnel.forEach(p=>{
+        roster.innerHTML+=`<div class="list-item"><strong>${p.Name}</strong><span class="list-meta"> — ${p.Certification || ""}</span></div>`;
+      });
+    }
+
+    // ------- Insert handlers -------
+    const postJSON = async (url, payload) => {
+      const res = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) });
+      return res.json();
+    };
+    
+    const deleteOp = async (url) => {
+        const res = await fetch(url, { method: "DELETE" });
+        return res.json();
+    };
+
+
+    // Disaster
+    document.getElementById("disasterForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const payload = Object.fromEntries(new FormData(e.target).entries());
+      const r = await postJSON("/api/add-disaster", payload);
+      document.getElementById("msg-disaster").textContent = r.message || r.error;
+      loadOverview();
+      refreshRefs();
+    });
+
+    // Drone
+    document.getElementById("droneForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const payload = Object.fromEntries(new FormData(e.target).entries());
+      const r = await postJSON("/api/add-drone", payload);
+      document.getElementById("msg-drone").textContent = r.message || r.error;
+      loadOverview();
+    });
+
+    // Operator
+    document.getElementById("operatorForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const payload = Object.fromEntries(new FormData(e.target).entries());
+      const r = await postJSON("/api/add-operator", payload);
+      document.getElementById("msg-operator").textContent = r.message || r.error;
+      loadOverview();
+    });
+
+    // Mission
+    document.getElementById("missionForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const payload = Object.fromEntries(new FormData(e.target).entries());
+      const r = await postJSON("/api/add-mission", payload);
+      document.getElementById("msg-mission").textContent = r.message || r.error;
+      loadOverview();
+      refreshRefs();
+    });
+
+    // Alert
+    document.getElementById("alertForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const payload = Object.fromEntries(new FormData(e.target).entries());
+      const r = await postJSON("/api/add-alert", payload);
+      document.getElementById("msg-alert").textContent = r.message || r.error;
+      loadOverview();
+    });
+
+    // Resolve Disaster
+    document.getElementById("resolveForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const payload = Object.fromEntries(new FormData(e.target).entries());
+      const r = await postJSON("/api/resolve-disaster", payload);
+      document.getElementById("msg-resolve").textContent = r.message || r.error;
+      loadOverview();
+      refreshRefs();
+    });
+    
+    // Delete Disaster (NEW HANDLER)
+    document.getElementById("deleteDisasterForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const D_ID = formData.get("D_ID");
+      
+      const r = await deleteOp(`/api/delete-disaster/${D_ID}`);
+      document.getElementById("msg-delete").textContent = r.message || r.error;
+      loadOverview();
+      refreshRefs();
+    });
+
+
+    // ------- Reference dropdowns -------
+    async function refreshRefs(){
+      // Disasters
+      const disasters = await (await fetch("/api/list/disasters")).json();
+      const dSelIds = ["drone-DID", "resolve-DID", "delete-DID"]; // Added delete-DID
+      dSelIds.forEach(id => {
+          const sel = document.getElementById(id);
+          if (!sel) return;
+          const current = sel.value;
+          sel.innerHTML = disasters.map(d=>`<option value="${d.D_ID}">${d.D_ID} — ${d.Name}</option>`).join("");
+          if (current) sel.value = current;
+      });
+
+      // Drones
+      const drones = await (await fetch("/api/list/drones")).json();
+      const drSel = document.getElementById("alert-DNO");
+      if (drSel){
+        const current = drSel.value;
+        drSel.innerHTML = drones.map(d=>`<option value="${d.D_NO}">${d.D_NO} — ${d.Model}</option>`).join("");
+        if (current) drSel.value = current;
+      }
+
+      // Missions
+      const missions = await (await fetch("/api/list/missions")).json();
+      const mSel = document.getElementById("alert-MRID");
+      if (mSel){
+        const current = mSel.value;
+        mSel.innerHTML = missions.map(m=>`<option value="${m.MR_ID}">${m.MR_ID}</option>`).join("");
+        if (current) mSel.value = current;
+      }
+    }
+
+    window.onload=()=>{
+      loadOverview();
+      refreshRefs();
+      ["query1","query2","query3","query4","query5"].forEach((q,i)=>fetchData(q,`output${i+1}`));
+    };
+  </script>
+
+</body>
+</html>
